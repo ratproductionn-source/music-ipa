@@ -1,0 +1,61 @@
+# XcodeGen spec — run `xcodegen generate` to create Sdab.xcodeproj
+name: Sdab
+
+options:
+  bundleIdPrefix: com.sdab
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+
+packages:
+  YouTubeKit:
+    url: https://github.com/alexeichhorn/YouTubeKit
+    from: "0.4.10"
+
+targets:
+  Sdab:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sdab
+    dependencies:
+      - package: YouTubeKit
+    scheme: {}
+    info:
+      path: Config/Info.plist
+      properties:
+        CFBundleDisplayName: Sdab
+        CFBundleShortVersionString: "1.0"
+        CFBundleVersion: "1"
+        UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        # Keep playing when the screen locks or you switch apps
+        UIBackgroundModes: [audio]
+        # Show the Media folder in the Files app
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        # sdab://download?url=... (used by the Share-sheet Shortcut)
+        CFBundleURLTypes:
+          - CFBundleURLName: com.sdab.app
+            CFBundleURLSchemes: [sdab]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.sdab.app
+        PRODUCT_NAME: Sdab
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CODE_SIGN_STYLE: Automatic
+        ENABLE_PREVIEWS: YES
