@@ -10,7 +10,7 @@ options:
 packages:
   YouTubeKit:
     url: https://github.com/alexeichhorn/YouTubeKit
-    from: "0.4.10"
+    branch: main
 
 targets:
   Sdab:
