@@ -1,5 +1,5 @@
-# Builds an unsigned Sdab.ipa on GitHub's Mac machines.
-# Sign and install it with Sideloadly, AltStore or SideStore (see README).
+# Builds an unsigned Sdab.ipa on GitHub's Mac machines, verifies its layout,
+# then uploads it. Sign and install it with Sideloadly, AltStore, SideStore or ESign.
 name: Build IPA
 
 on:
@@ -10,6 +10,10 @@ on:
 
 permissions:
   contents: write
+
+concurrency:
+  group: build-ipa-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -27,34 +31,52 @@ jobs:
       - name: Generate Xcode project
         run: xcodegen generate
 
-      - name: Build app (unsigned)
+      # Archive instead of a plain build: the .xcarchive/Products/Applications
+      # layout is what Xcode itself would hand to a re-signer, and it catches
+      # packaging problems earlier.
+      - name: Archive app (unsigned)
         run: |
           set -o pipefail
-          xcodebuild \
+          xcodebuild archive \
             -project Sdab.xcodeproj \
             -scheme Sdab \
             -configuration Release \
-            -sdk iphoneos \
             -destination 'generic/platform=iOS' \
-            -derivedDataPath build \
+            -archivePath build/Sdab.xcarchive \
+            -derivedDataPath build/DerivedData \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            clean build | tee xcodebuild.log | grep -E "error:|warning: .*Sdab/|BUILD (SUCCEEDED|FAILED)" || true
-          test -d build/Build/Products/Release-iphoneos/Sdab.app
+            clean archive 2>&1 | tee xcodebuild.log | grep -E "error:|warning: .*Sdab/|ARCHIVE (SUCCEEDED|FAILED)" || true
+          test -d build/Sdab.xcarchive/Products/Applications/Sdab.app
+          test -f build/Sdab.xcarchive/Products/Applications/Sdab.app/Sdab
 
       - name: Package IPA
         run: |
+          set -euo pipefail
+          APP="build/Sdab.xcarchive/Products/Applications/Sdab.app"
+          rm -rf Payload Sdab.ipa
           mkdir -p Payload
-          cp -R build/Build/Products/Release-iphoneos/Sdab.app Payload/
-          zip -qry Sdab.ipa Payload
+          # ditto preserves POSIX permissions and symlinks (cp -R can drop them).
+          ditto "$APP" "Payload/Sdab.app"
+          find Payload -name '.DS_Store' -delete
+          find Payload -name '__MACOSX' -prune -exec rm -rf {} +
+          EXE=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "Payload/Sdab.app/Info.plist")
+          chmod 755 "Payload/Sdab.app/$EXE"
+          # ditto (not `zip`) is the Apple-recommended way to produce an IPA.
+          ditto -c -k --keepParent Payload Sdab.ipa
           ls -lh Sdab.ipa
+          shasum -a 256 Sdab.ipa
+
+      - name: Verify IPA
+        run: bash scripts/verify-ipa.sh Sdab.ipa
 
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
           name: Sdab-ipa
           path: Sdab.ipa
+          if-no-files-found: error
 
       - name: Upload build log
         if: always()
